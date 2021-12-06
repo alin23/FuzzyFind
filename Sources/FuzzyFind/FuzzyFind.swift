@@ -36,7 +36,8 @@ public func fuzzyFind(
                     boundaryBonus: boundaryBonus,
                     camelCaseBonus: camelCaseBonus,
                     firstCharBonusMultiplier: firstCharBonusMultiplier,
-                    consecutiveBonus: consecutiveBonus).map { match in
+                    consecutiveBonus: consecutiveBonus
+                ).map { match in
                     alignment.combine(match)
                 }
             }
@@ -89,7 +90,7 @@ public func bestMatch(
     let m = query.count
     let n = input.count
     let bonuses = (0 ... m).map { i in
-        (0 ... n).map { j in bonus(i,j) }
+        (0 ... n).map { j in bonus(i, j) }
     }
     var hs: [Pair<Int, Int>: Score] = [:]
 
@@ -192,4 +193,75 @@ private struct Pair<A: Hashable, B: Hashable>: Hashable {
         self.a = a
         self.b = b
     }
+}
+
+public protocol FuzzyFindable {
+    var searchProperty: String { get }
+    var searchAlignment: Alignment? { get set }
+}
+
+public extension Array where Element: FuzzyFindable {
+    func fuzzyFind(_ filter: String) -> Element? {
+        fuzzysearch(filter, in: self).first
+    }
+
+    func fuzzyFindAll(_ filter: String) -> [Element] {
+        fuzzysearch(filter, in: self)
+    }
+
+    func fuzzyFind(_ filter: [String]) -> Element? {
+        fuzzysearch(filter, in: self).first
+    }
+
+    func fuzzyFindAll(_ filter: [String]) -> [Element] {
+        fuzzysearch(filter, in: self)
+    }
+}
+
+public func fuzzysearch<T: FuzzyFindable>(
+    _ filter: [String],
+    in list: [T],
+    match _: Score = .defaultMatch,
+    mismatch _: Score = .defaultMismatch,
+    gapPenalty _: (Int) -> Score = Score.defaultGapPenalty,
+    boundaryBonus _: Score = .defaultBoundary,
+    camelCaseBonus _: Score = .defaultCamelCase,
+    firstCharBonusMultiplier _: Int = Score.defaultFirstCharBonusMultiplier,
+    consecutiveBonus _: Score = Score.defaultConsecutiveBonus
+) -> [T] {
+    let alignments = fuzzyFind(queries: filter, inputs: list.map(\.searchProperty))
+    let foundProperties = [String: Alignment](alignments.map { ($0.result.asString, $0) }, uniquingKeysWith: { first, _ in first })
+    guard !foundProperties.isEmpty else { return [] }
+
+    return list
+        .filter { foundProperties[$0.searchProperty] != nil }
+        .map {
+            var mutable = $0
+            mutable.searchAlignment = foundProperties[mutable.searchProperty]
+            return mutable
+        }
+        .sorted { a1, a2 in a1.searchAlignment!.score > a2.searchAlignment!.score }
+}
+
+public func fuzzysearch<T: FuzzyFindable>(
+    _ filter: String,
+    in list: [T],
+    match: Score = .defaultMatch,
+    mismatch: Score = .defaultMismatch,
+    gapPenalty: (Int) -> Score = Score.defaultGapPenalty,
+    boundaryBonus: Score = .defaultBoundary,
+    camelCaseBonus: Score = .defaultCamelCase,
+    firstCharBonusMultiplier: Int = Score.defaultFirstCharBonusMultiplier,
+    consecutiveBonus: Score = Score.defaultConsecutiveBonus
+) -> [T] {
+    return fuzzysearch(
+        [filter], in: list,
+        match: match,
+        mismatch: mismatch,
+        gapPenalty: gapPenalty,
+        boundaryBonus: boundaryBonus,
+        camelCaseBonus: camelCaseBonus,
+        firstCharBonusMultiplier: firstCharBonusMultiplier,
+        consecutiveBonus: consecutiveBonus
+    )
 }
